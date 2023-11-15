@@ -10,14 +10,30 @@ TEMP_SCREENSHOT_PATH = "temp.png"
 
 api_key = os.environ.get('OPENAI_API_KEY')
 
-# Function to encode the image
 def encode_image(image_path):
+     """Encodes the image from the specified path into a base64 string.
+
+    Parameters:
+    - image_path (str): The path to the image file.
+
+    Returns:
+    - encoded_image (str): The base64 encoded image string.
+    """
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
 
 def take_screenshot(image_path=TEMP_SCREENSHOT_PATH):
-    # Take a screenshot
+    """Takes a screenshot of the screen and saves it as a downscaled image.
+
+    Args:
+        image_path (str, optional): The path where the downscaled screenshot image will be saved.
+            Defaults to TEMP_SCREENSHOT_PATH.
+
+    Returns:
+        tuple: A tuple containing the downscaled image and the size of the original screen.
+
+    """
     screenshot = pyautogui.screenshot()
     scale = 4
     downsampled_image = screenshot.resize(
@@ -32,9 +48,25 @@ def take_screenshot(image_path=TEMP_SCREENSHOT_PATH):
     return downsampled_image, screen_size
 
 def is_retina():
+    """Check if the screen is retina."""
     return subprocess.call("system_profiler SPDisplaysDataType | grep 'Retina'", shell= True) == 0
 
 def crop_image(image, xmin, ymin, xmax, ymax):
+    """Crop an image based on given bounding box coordinates.
+
+    Args:
+        image (PIL.Image.Image): The input image to be cropped.
+        xmin (float): The normalized minimum x-coordinate of the bounding box.
+        ymin (float): The normalized minimum y-coordinate of the bounding box.
+        xmax (float): The normalized maximum x-coordinate of the bounding box.
+        ymax (float): The normalized maximum y-coordinate of the bounding box.
+
+    Returns:
+        PIL.Image.Image: The cropped image.
+
+    Note: The coordinates should be normalized between 0 and 1, where (0, 0) represents the top left corner
+    of the image and (1, 1) represents the bottom right corner of the image.
+    """
     # Get the width and height of the image
     width, height = image.size
 
@@ -49,6 +81,25 @@ def crop_image(image, xmin, ymin, xmax, ymax):
     return cropped_image
 
 def move_to_block(x, y, xmin, ymin, xmax, ymax):
+    """Moves the mouse cursor to a specific location on the screen and shrink the area.
+
+    Parameters:
+    x (float): The x-coordinate of the target location, relative to the minimum and maximum x-values provided.
+    y (float): The y-coordinate of the target location, relative to the minimum and maximum y-values provided.
+    xmin (float): The minimum x-value of the bounding box.
+    ymin (float): The minimum y-value of the bounding box.
+    xmax (float): The maximum x-value of the bounding box.
+    ymax (float): The maximum y-value of the bounding box.
+
+    Returns:
+    (float, float, float, float): A tuple representing the coordinates for cropping the image. The tuple contains the
+    minimum x-value, minimum y-value, maximum x-value, and maximum y-value for cropping.
+
+    Example:
+    crop_xmin, crop_ymin, crop_xmax, crop_ymax = move_to_block(0.3, 0.8, 0, 0, 1, 1)
+    # The mouse cursor will move to the (0.3, 0.8) location on the screen.
+    # The returned cropping coordinates will be 1/4 area of (0, 0, 1, 1).
+    """
     x = xmin + (xmax - xmin) * x
     y = ymin + (ymax - ymin) * y
     xcenter = (xmin + xmax) / 2.0
@@ -69,6 +120,14 @@ def move_to_block(x, y, xmin, ymin, xmax, ymax):
     return crop_xmin, crop_ymin, crop_xmax, crop_ymax
 
 def ask(concept: str):
+    """Find a concept on the screen and move the mouse to click it.
+    
+    Takes a concept as input and performs sequential localization on a screenshot to determine the location of the concept
+    on the screen.
+
+    Parameters:
+        concept (str): The concept to be localized on the screen.
+    """
     image_path = TEMP_SCREENSHOT_PATH
     screen, screen_size = take_screenshot(image_path=image_path)
     width, height = screen_size
@@ -107,6 +166,22 @@ def ask(concept: str):
 
 
 def ask_gpt(query: str, image_path=TEMP_SCREENSHOT_PATH):
+    """Use GPT-4 Vision API to ask a question based on an image.
+
+    Parameters:
+        query (str): The question/query to ask based on the image.
+        image_path (str, optional): The path to the image file to be analyzed. Defaults to TEMP_SCREENSHOT_PATH.
+
+    Returns:
+        str: The generated response/answer from the GPT-4 Vision API.
+
+    Raises:
+        None
+
+    Examples:
+        >>> ask_gpt("What is this object?", "image.png")
+        "This object is a cat."
+    """
 
     # Getting the base64 string
     base64_image = encode_image(image_path)
