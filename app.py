@@ -1,4 +1,22 @@
 import vision
+import pyautogui
+
+def run(query: str):
+    """Run query."""
+    if query.startswith("type"):
+        # Keyboard.
+        pyautogui.write(query[len("type "):])
+    else:
+        # Mouse.
+        response = vision.ask(query)
+        if 'choices' in response:
+            message = response['choices'][0]['message']
+            role = message['role']
+            content = message['content']
+            print(f'\n{role}: {content}')
+        else:
+            print(response)
+
 
 
 def main():
@@ -10,12 +28,8 @@ def main():
 
     while True:
         query = input("Query: ")
-        response = vision.ask(query)
-        message = response['choices'][0]['message']
-        role = message['role']
-        content = message['content']
-        print()
-        print(f'{role}: {content}')
+        run(query)
+
 
 
 if __name__ == '__main__':

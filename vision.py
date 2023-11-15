@@ -11,7 +11,7 @@ TEMP_SCREENSHOT_PATH = "temp.png"
 api_key = os.environ.get('OPENAI_API_KEY')
 
 def encode_image(image_path):
-     """Encodes the image from the specified path into a base64 string.
+    """Encodes the image from the specified path into a base64 string.
 
     Parameters:
     - image_path (str): The path to the image file.
@@ -143,6 +143,9 @@ def ask(concept: str):
         # Sequential localization.
         query = f"Where is `{concept}`? Share the x_min, y_min, x_max, y_max in 0-1 normalized space. Only return the numbers, nothing else."
         response = ask_gpt(query, image_path=image_path)
+        if 'choices' not in response:
+            # Stop.
+            return response
         message = response['choices'][0]['message']
         role = message['role']
         content = message['content']
