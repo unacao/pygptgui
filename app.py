@@ -1,5 +1,22 @@
+import os
+from configparser import ConfigParser
 import vision
 import pyautogui
+
+'''Load OpenAI api key from environment variable or ini config
+sample ini config: api_key.ini
+[openai]
+APIKEY = xxx
+'''
+api_key = os.environ.get('OPENAI_API_KEY')
+if api_key is None:
+    try:
+        config = ConfigParser()
+        config.read(os.path.join(os.getcwd(), 'api_key.ini'))
+        api_key = config.get('openai', 'APIKEY')
+    except:
+        print('No OpenAI api key found!')
+        exit()
 
 def run(query: str):
     """Run query."""
@@ -8,7 +25,7 @@ def run(query: str):
         pyautogui.write(query[len("type "):])
     else:
         # Mouse.
-        response = vision.ask(query)
+        response = vision.ask(query, api_key)
         if 'choices' in response:
             message = response['choices'][0]['message']
             role = message['role']

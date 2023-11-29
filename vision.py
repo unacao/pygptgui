@@ -1,14 +1,13 @@
 from openai import OpenAI
 import pyautogui
 import os
+import sys
 import base64
 import requests
 import subprocess
 
 # Path to your image
 TEMP_SCREENSHOT_PATH = "temp.png"
-
-api_key = os.environ.get('OPENAI_API_KEY')
 
 def encode_image(image_path):
     """Encodes the image from the specified path into a base64 string.
@@ -49,7 +48,10 @@ def take_screenshot(image_path=TEMP_SCREENSHOT_PATH):
 
 def is_retina():
     """Check if the screen is retina."""
-    return subprocess.call("system_profiler SPDisplaysDataType | grep 'Retina'", shell= True) == 0
+    if sys.platform != 'win32':
+        return subprocess.call("system_profiler SPDisplaysDataType | grep 'Retina'", shell= True) == 0
+    else:
+        return False
 
 def crop_image(image, xmin, ymin, xmax, ymax):
     """Crop an image based on given bounding box coordinates.
@@ -119,7 +121,7 @@ def move_to_block(x, y, xmin, ymin, xmax, ymax):
     pyautogui.moveTo(x, y, 1, pyautogui.easeOutQuad)
     return crop_xmin, crop_ymin, crop_xmax, crop_ymax
 
-def ask(concept: str):
+def ask(concept: str, api_key: str):
     """Find a concept on the screen and move the mouse to click it.
     
     Takes a concept as input and performs sequential localization on a screenshot to determine the location of the concept
@@ -142,33 +144,37 @@ def ask(concept: str):
     for _ in range(3):
         # Sequential localization.
         query = f"Where is `{concept}`? Share the x_min, y_min, x_max, y_max in 0-1 normalized space. Only return the numbers, nothing else."
-        response = ask_gpt(query, image_path=image_path)
+        response = ask_gpt(query, api_key, image_path=image_path)
         if 'choices' not in response:
             # Stop.
             return response
         message = response['choices'][0]['message']
         role = message['role']
         content = message['content']
-        xmin, ymin, xmax, ymax = tuple(map(float, content.split(',')))
-        x = (xmin+xmax) / 2.0
-        y = (ymin+ymax) / 2.0
-        crop_xmin, crop_ymin, crop_xmax, crop_ymax = move_to_block(x, y, screen_xmin, screen_ymin, screen_xmax, screen_ymax)
+        try:
+            xmin, ymin, xmax, ymax = tuple(map(float, content.split(',')))
+            x = (xmin+xmax) / 2.0
+            y = (ymin+ymax) / 2.0
+            crop_xmin, crop_ymin, crop_xmax, crop_ymax = move_to_block(x, y, screen_xmin, screen_ymin, screen_xmax, screen_ymax)
 
-        # Refine the bbox.
-        screen = crop_image(screen, crop_xmin, crop_ymin, crop_xmax, crop_ymax)
-        screen.save(image_path)
-        new_xmin = screen_xmin + crop_xmin * (screen_xmax - screen_xmin)
-        new_xmax = screen_xmin + crop_xmax * (screen_xmax - screen_xmin)
-        new_ymin = screen_ymin + crop_ymin * (screen_ymax - screen_ymin)
-        new_ymax = screen_ymin + crop_ymax * (screen_ymax - screen_ymin)
-        screen_xmin, screen_xmax, screen_ymin, screen_ymax = new_xmin, new_xmax, new_ymin, new_ymax
+            # Refine the bbox.
+            screen = crop_image(screen, crop_xmin, crop_ymin, crop_xmax, crop_ymax)
+            screen.save(image_path)
+            new_xmin = screen_xmin + crop_xmin * (screen_xmax - screen_xmin)
+            new_xmax = screen_xmin + crop_xmax * (screen_xmax - screen_xmin)
+            new_ymin = screen_ymin + crop_ymin * (screen_ymax - screen_ymin)
+            new_ymax = screen_ymin + crop_ymax * (screen_ymax - screen_ymin)
+            screen_xmin, screen_xmax, screen_ymin, screen_ymax = new_xmin, new_xmax, new_ymin, new_ymax
+        except:
+            print(f"Failed: {content}")
+    
+    if screen_xmin !=0 and screen_ymin != 0:
+        pyautogui.click()
+        return f"Clicked ({x}, {y})"
+    else:
+        return content
 
-    pyautogui.click()
-
-    return response
-
-
-def ask_gpt(query: str, image_path=TEMP_SCREENSHOT_PATH):
+def ask_gpt(query: str, api_key: str, image_path=TEMP_SCREENSHOT_PATH):
     """Use GPT-4 Vision API to ask a question based on an image.
 
     Parameters:
@@ -182,7 +188,7 @@ def ask_gpt(query: str, image_path=TEMP_SCREENSHOT_PATH):
         None
 
     Examples:
-        >>> ask_gpt("What is this object?", "image.png")
+        >>> ask_gpt("What is this object?", "{your_openai_api_key}", "image.png")
         "This object is a cat."
     """
 
@@ -221,6 +227,7 @@ def ask_gpt(query: str, image_path=TEMP_SCREENSHOT_PATH):
                              headers=headers,
                              json=payload)
 
+    # TODO potential RequestsJSONDecodeError
     return response.json()
 
 
